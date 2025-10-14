@@ -9,21 +9,27 @@ RUN install-php-extensions \
     pcntl
 ENV SERVER_NAME=:80
 
-FROM node:22-alpine AS node
+FROM base AS builder
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN apt-get update && apt-get install -y \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
 COPY . .
-RUN npm run build
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN npm ci && npm run build:ssr
 
 FROM base AS production
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 COPY . /app
-COPY --from=node /app/public/build /app/public/build
-COPY --from=node /app/bootstrap/ssr /app/bootstrap/ssr
-RUN composer install --no-dev --optimize-autoloader --no-interaction && \
-    php artisan optimize && \
+COPY --from=builder /app/vendor /app/vendor
+COPY --from=builder /app/public/build /app/public/build
+COPY --from=builder /app/bootstrap/ssr /app/bootstrap/ssr
+RUN php artisan optimize && \
     chown -R www-data:www-data /app/storage /app/bootstrap/cache
 CMD ["php", "artisan", "octane:frankenphp"]
