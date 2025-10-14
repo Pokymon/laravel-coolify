@@ -27,6 +27,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 WORKDIR /app
 COPY . .
 COPY --from=builder /app/vendor /app/vendor
+COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/public/build /app/public/build
 COPY --from=builder /app/bootstrap/ssr /app/bootstrap/ssr
 RUN php artisan optimize && \
