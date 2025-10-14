@@ -4,6 +4,9 @@ RUN install-php-extensions \
     redis \
     zip \
     gd \
+    mbstring \
+    exif \
+    bcmath \
     opcache \
     intl \
     pcntl
