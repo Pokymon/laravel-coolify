@@ -1,0 +1,63 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: laravel
+    container_name: laravel-app
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/up"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+    labels:
+      - "traefik.http.middlewares.ipwhitelist.ipwhitelist.sourcerange=0.0.0.0/0,::/0"
+      - "traefik.http.middlewares.add-forwarded-headers.headers.customrequestheaders.X-Forwarded-For=X-Real-IP"
+      - "traefik.http.middlewares.upload-limit.buffering.maxRequestBodyBytes=67108864"
+
+  ssr:
+    image: laravel
+    container_name: laravel-ssr
+    restart: unless-stopped
+    command: ["php", "/app/artisan", "inertia:start-ssr"]
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:13714/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+
+  scheduler:
+    image: laravel
+    container_name: laravel-scheduler
+    restart: unless-stopped
+    command: ["php", "/app/artisan", "schedule:work"]
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      - app
+
+  db:
+    image: postgres:18
+    container_name: laravel-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
